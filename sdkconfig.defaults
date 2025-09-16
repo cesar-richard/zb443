@@ -1,0 +1,32 @@
+# Target
+CONFIG_IDF_TARGET="esp32c6"
+# Flash size
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# Partition table
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+# Logs
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+# Zigbee: Router
+CONFIG_ZB_ENABLED=y
+CONFIG_ZB_ROLE_ROUTER=y
+CONFIG_ZB_PRIMARY_CHANNEL_MASK=0x03180000
+CONFIG_ZB_RADIO_TX_POWER=20
+
+# Wi-Fi (activé pour OTA)
+CONFIG_ESP_WIFI_ENABLED=y
+
+# OTA HTTP
+CONFIG_OTA_ALLOW_HTTP=y
+
+# Wi-Fi credentials (change with menuconfig if you prefer)
+CONFIG_ZB433_WIFI_SSID="Licornes"
+CONFIG_ZB433_WIFI_PASS="UnicornPowaaaaa"
+
+# Default OTA URL
+CONFIG_ZB433_DEFAULT_OTA_URL="http://homeassistant.local:8123/local/zb433.bin"
+
