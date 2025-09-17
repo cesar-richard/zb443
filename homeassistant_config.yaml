@@ -1,0 +1,161 @@
+# Configuration Home Assistant pour ZB433 Router
+
+# À ajouter dans votre configuration.yaml
+
+# Configuration MQTT
+mqtt:
+  broker: localhost
+  port: 1883
+  username: !secret mqtt_username
+  password: !secret mqtt_password
+
+# Automatisations pour les portes CAME-24
+automation:
+  # Ouvrir Porte A
+  - alias: "Ouvrir Porte A"
+    trigger:
+      platform: mqtt
+      topic: "zigbee2mqtt/ZB433 Router/10/set"
+      payload: "ON"
+    action:
+      service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/ZB433 Router/10/set"
+        payload: "ON"
+    mode: single
+
+  # Ouvrir Porte B
+  - alias: "Ouvrir Porte B"
+    trigger:
+      platform: mqtt
+      topic: "zigbee2mqtt/ZB433 Router/11/set"
+      payload: "ON"
+    action:
+      service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/ZB433 Router/11/set"
+        payload: "ON"
+    mode: single
+
+  # Déclencher OTA
+  - alias: "Déclencher OTA"
+    trigger:
+      platform: mqtt
+      topic: "zigbee2mqtt/ZB433 Router/13/set"
+      payload: "ON"
+    action:
+      service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/ZB433 Router/13/set"
+        payload: "ON"
+    mode: single
+
+  # Factory Reset
+  - alias: "Factory Reset ZB433"
+    trigger:
+      platform: mqtt
+      topic: "zigbee2mqtt/ZB433 Router/14/set"
+      payload: "ON"
+    action:
+      service: mqtt.publish
+      data:
+        topic: "zigbee2mqtt/ZB433 Router/14/set"
+        payload: "ON"
+    mode: single
+
+# Scripts pour faciliter l'utilisation
+script:
+  ouvrir_porte_a:
+    alias: "Ouvrir Porte A"
+    sequence:
+      - service: mqtt.publish
+        data:
+          topic: "zigbee2mqtt/ZB433 Router/10/set"
+          payload: "ON"
+      - delay: "00:00:01"
+      - service: mqtt.publish
+        data:
+          topic: "zigbee2mqtt/ZB433 Router/10/set"
+          payload: "OFF"
+
+  ouvrir_porte_b:
+    alias: "Ouvrir Porte B"
+    sequence:
+      - service: mqtt.publish
+        data:
+          topic: "zigbee2mqtt/ZB433 Router/11/set"
+          payload: "ON"
+      - delay: "00:00:01"
+      - service: mqtt.publish
+        data:
+          topic: "zigbee2mqtt/ZB433 Router/11/set"
+          payload: "OFF"
+
+  declencher_ota:
+    alias: "Déclencher OTA"
+    sequence:
+      - service: mqtt.publish
+        data:
+          topic: "zigbee2mqtt/ZB433 Router/13/set"
+          payload: "ON"
+      - delay: "00:00:01"
+      - service: mqtt.publish
+        data:
+          topic: "zigbee2mqtt/ZB433 Router/13/set"
+          payload: "OFF"
+
+  factory_reset:
+    alias: "Factory Reset ZB433"
+    sequence:
+      - service: mqtt.publish
+        data:
+          topic: "zigbee2mqtt/ZB433 Router/14/set"
+          payload: "ON"
+      - delay: "00:00:01"
+      - service: mqtt.publish
+        data:
+          topic: "zigbee2mqtt/ZB433 Router/14/set"
+          payload: "OFF"
+
+# Interface utilisateur Lovelace
+lovelace:
+  mode: yaml
+  dashboards:
+    zb433:
+      title: "ZB433 Router"
+      path: "zb433"
+      icon: mdi:zigbee
+      show_in_sidebar: true
+      badges: []
+      cards:
+        - type: entities
+          title: "Contrôles ZB433"
+          entities:
+            - script.ouvrir_porte_a
+            - script.ouvrir_porte_b
+            - script.declencher_ota
+            - script.factory_reset
+        - type: button
+          name: "Porte A"
+          icon: mdi:gate
+          tap_action:
+            action: call-service
+            service: script.ouvrir_porte_a
+        - type: button
+          name: "Porte B"
+          icon: mdi:gate
+          tap_action:
+            action: call-service
+            service: script.ouvrir_porte_b
+        - type: button
+          name: "OTA"
+          icon: mdi:update
+          tap_action:
+            action: call-service
+            service: script.declencher_ota
+        - type: button
+          name: "Factory Reset"
+          icon: mdi:restore
+          tap_action:
+            action: call-service
+            service: script.factory_reset

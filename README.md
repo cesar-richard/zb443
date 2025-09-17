@@ -1,318 +1,146 @@
-# ZB433 - Routeur Zigbee ESP32-C6 avec CAME-24 et OTA
+# ZB433 Router - ESP32-C6 Zigbee + 433MHz CAME-24
 
-Routeur Zigbee ESP32-C6 qui expose 4 endpoints pour contrôler des portes CAME-24 via 433 MHz et gérer les mises à jour OTA.
+[![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.2.x-blue.svg)](https://github.com/espressif/esp-idf)
+[![ESP32-C6](https://img.shields.io/badge/ESP32--C6-RISC--V-green.svg)](https://www.espressif.com/en/products/socs/esp32-c6)
+[![Zigbee](https://img.shields.io/badge/Zigbee-3.0-orange.svg)](https://zigbeealliance.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Fonctionnalités
+## Vue d'ensemble
 
-- **EP10** : Switch On/Off → Envoie trame 433 MHz CAME-24 (clé `0x03B29B`) pour porte A
-- **EP11** : Switch On/Off → Envoie trame 433 MHz CAME-24 (clé `0x03B29A`) pour porte B  
-- **EP13** : Switch On/Off → Déclenche séquence OTA (firmware via Wi-Fi/HTTP)
-- **EP14** : Switch On/Off → Factory Reset (efface NVS, reboot, repart en inclusion)
+Le **ZB433 Router** est un routeur Zigbee ESP32-C6 capable de contrôler des portes CAME-24 via 433MHz et de recevoir des mises à jour OTA. Il agit comme un pont entre votre réseau Zigbee (Zigbee2MQTT) et vos équipements CAME-24 existants.
 
-## Hardware
+### Fonctionnalités
 
-- **MCU** : ESP32-C6
-- **TX 433 MHz** : GPIO4 (modifiable dans `main.c`)
-- **Alimentation** : 3.3V (via USB ou alimentation externe)
+- **Routeur Zigbee 3.0** : Compatible avec Zigbee2MQTT
+- **Contrôle 433MHz CAME-24** : Deux clés (0x03B29B et 0x03B29A)
+- **Mises à jour OTA** : Mise à jour du firmware via Wi-Fi
+- **Factory Reset** : Retour à l'état d'inclusion via Zigbee
+- **4 Endpoints** : Porte A, Porte B, OTA, Factory Reset
 
-## Installation ESP-IDF
+## Installation
 
-### 1. Installer ESP-IDF v5.2.x
+### Prérequis
 
-```bash
-# Cloner ESP-IDF
-git clone -b v5.2.2 --recursive https://github.com/espressif/esp-idf.git ~/esp-idf
+- **ESP-IDF v5.2.x** installé et configuré
+- **ESP32-C6 DevKit** (alimentation via USB)
+- **Émetteur 433MHz FS1000A** (ASK/OOK)
+- **Zigbee2MQTT** configuré avec Home Assistant
 
-# Installer les outils
-cd ~/esp-idf
-./install.sh esp32c6
-
-# Configurer l'environnement (à faire à chaque session)
-. ~/esp-idf/export.sh
-```
-
-### 2. Vérifier l'installation
+### Compilation et flash
 
 ```bash
-idf.py --version
-# Devrait afficher : ESP-IDF v5.2.2
-```
+# Configurer l'environnement ESP-IDF
+source ~/esp-idf/export.sh
 
-## Configuration du projet
-
-### 1. Cloner le projet
-
-```bash
-git clone <votre-repo> zb433
-cd zb433
-```
-
-### 2. Configurer le target
-
-```bash
+# Configurer la cible
 idf.py set-target esp32c6
-```
 
-### 3. Configurer Wi-Fi et OTA (optionnel)
-
-```bash
-idf.py menuconfig
-```
-
-Ou modifier directement `sdkconfig.defaults` :
-
-```ini
-# Wi-Fi credentials
-CONFIG_ZB433_WIFI_SSID="VotreSSID"
-CONFIG_ZB433_WIFI_PASS="VotreMotDePasse"
-
-# Default OTA URL
-CONFIG_ZB433_DEFAULT_OTA_URL="http://homeassistant.local:8123/local/zb433.bin"
-```
-
-## Compilation et Flash
-
-### Méthode 1 : Commandes manuelles
-
-```bash
 # Compiler
 idf.py build
 
-# Flasher (remplacer /dev/ttyUSB0 par votre port)
+# Flasher et monitorer
 idf.py -p /dev/ttyUSB0 flash monitor
-
-# Ou en une seule commande
-idf.py -p /dev/ttyUSB0 build flash monitor
 ```
 
-### Méthode 2 : Script automatisé
+### Configuration Wi-Fi
+
+Éditer `sdkconfig.defaults` :
+
+```ini
+CONFIG_ZB433_WIFI_SSID="VOTRE_SSID"
+CONFIG_ZB433_WIFI_PASSWORD="VOTRE_MOT_DE_PASSE"
+CONFIG_ZB433_DEFAULT_OTA_URL="http://homeassistant.local:8123/local/zb433.bin"
+```
+
+## Configuration
+
+### Zigbee2MQTT
+
+1. Mettre le coordinateur en mode "permit join"
+2. L'appareil s'inclut automatiquement et expose 4 endpoints :
+   - **EP10** : Porte A (clé 0x03B29B)
+   - **EP11** : Porte B (clé 0x03B29A)  
+   - **EP13** : OTA Wi-Fi
+   - **EP14** : Factory Reset
+
+### Exemple MQTT
 
 ```bash
-# Rendre exécutable
-chmod +x build_and_flash.sh
+# Ouvrir Porte A
+mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/10/set" -m "ON"
 
-# Exécuter (modifier le port dans le script si nécessaire)
-./build_and_flash.sh
+# Ouvrir Porte B
+mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/11/set" -m "ON"
+
+# Déclencher OTA
+mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/13/set" -m "ON"
+
+# Factory Reset
+mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/14/set" -m "ON"
 ```
 
 ## Utilisation
 
-### 1. Inclusion Zigbee
+### Endpoints disponibles
 
-1. Mettre l'appareil sous tension
-2. L'appareil démarre automatiquement en mode inclusion
-3. Dans Zigbee2MQTT, cliquer sur "Permit join" 
-4. L'appareil apparaîtra avec 4 endpoints
+| Endpoint | Fonction | Commande | Action |
+|----------|----------|----------|--------|
+| **EP10** | Porte A | `ON` | Transmission 433MHz (clé 0x03B29B) |
+| **EP11** | Porte B | `ON` | Transmission 433MHz (clé 0x03B29A) |
+| **EP13** | OTA | `ON` | Déclenchement mise à jour Wi-Fi |
+| **EP14** | Factory Reset | `ON` | Effacement NVS + redémarrage |
 
-### 2. Contrôle des portes
+### Procédure OTA
 
-- **EP10** : Envoie `ON` → Porte A s'ouvre (clé CAME-24 `0x03B29B`)
-- **EP11** : Envoie `ON` → Porte B s'ouvre (clé CAME-24 `0x03B29A`)
+1. **Déposer le binaire** dans `config/www/` de Home Assistant
+2. **Accéder** à `http://homeassistant.local:8123/local/zb433.bin`
+3. **Déclencher** via EP13 ou modifier l'URL via attribut 0xF001
 
-### 3. Mise à jour OTA (EP13)
+### Procédure Factory Reset
 
-#### a) Configurer l'URL OTA
+- Envoyer `ON` sur EP14 → efface NVS + reboot automatique
 
-Envoyer une commande ZCL Write Attribute sur EP13, cluster Basic :
+## Schéma de câblage
 
-```json
-{
-  "endpoint": 13,
-  "cluster": "basic",
-  "attribute": "0xF001",
-  "manufacturerCode": 4660,
-  "value": "http://votre-serveur.local:8080/zb433.bin"
-}
-```
+Voir le guide détaillé: `CABLAGE_PROD_FS1000A.md` (montage 5V prod‑ready avec 2N2222 open‑collector, inversion déjà gérée par le firmware).
 
-#### b) Déclencher l'OTA
-
-Envoyer `ON` sur EP13 :
-
-```json
-{
-  "endpoint": 13,
-  "cluster": "onOff",
-  "command": "on"
-}
-```
-
-L'appareil va :
-1. Se connecter au Wi-Fi
-2. Télécharger le firmware depuis l'URL configurée
-3. Redémarrer avec le nouveau firmware
-
-### 4. Factory Reset (EP14)
-
-Envoyer `ON` sur EP14 :
-
-```json
-{
-  "endpoint": 14,
-  "cluster": "onOff", 
-  "command": "on"
-}
-```
-
-L'appareil va :
-1. Effacer toute la NVS
-2. Redémarrer
-3. Repartir en mode inclusion Zigbee
-
-## Configuration Zigbee2MQTT
-
-### 1. Configuration de base
-
-```yaml
-# configuration.yaml
-zigbee2mqtt:
-  # ... autres configs ...
-  devices:
-    '0x1234567890abcdef':  # Remplacer par l'IEEE de votre appareil
-      friendly_name: 'ZB433-Router'
-      description: 'Routeur Zigbee ESP32-C6 CAME-24'
-      retain: false
-```
-
-### 2. Automations pour OTA
-
-```yaml
-# automations.yaml
-- alias: 'ZB433 - Set OTA URL'
-  trigger:
-    platform: mqtt
-    topic: 'zigbee2mqtt/ZB433-Router/set'
-  action:
-    - service: mqtt.publish
-      data:
-        topic: 'zigbee2mqtt/ZB433-Router/13/basic/set'
-        payload: >
-          {
-            "0xF001": "http://homeassistant.local:8123/local/zb433.bin",
-            "manufacturerCode": 4660
-          }
-
-- alias: 'ZB433 - Trigger OTA'
-  trigger:
-    platform: state
-    entity_id: input_boolean.zb433_ota_trigger
-    to: 'on'
-  action:
-    - service: mqtt.publish
-      data:
-        topic: 'zigbee2mqtt/ZB433-Router/13/set'
-        payload: '{"state": "ON"}'
-    - service: input_boolean.turn_off
-      entity_id: input_boolean.zb433_ota_trigger
-
-- alias: 'ZB433 - Factory Reset'
-  trigger:
-    platform: state
-    entity_id: input_boolean.zb433_factory_reset
-    to: 'on'
-  action:
-    - service: mqtt.publish
-      data:
-        topic: 'zigbee2mqtt/ZB433-Router/14/set'
-        payload: '{"state": "ON"}'
-    - service: input_boolean.turn_off
-      entity_id: input_boolean.zb433_factory_reset
-```
-
-### 3. Interface Lovelace
-
-```yaml
-# ui-lovelace.yaml
-type: entities
-title: ZB433 Router
-entities:
-  - entity: zigbee2mqtt.zb433_router_10
-    name: Porte A
-  - entity: zigbee2mqtt.zb433_router_11  
-    name: Porte B
-  - entity: input_boolean.zb433_ota_trigger
-    name: Déclencher OTA
-  - entity: input_boolean.zb433_factory_reset
-    name: Factory Reset
-```
+- TX: `GPIO9` → R 1 kΩ → Base 2N2222, Collecteur → DATA FS1000A, Émetteur → GND, Pull‑up DATA 10 kΩ vers +5 V
+- Alim: +5 V et GND communs, 100 nF près du FS1000A, 470 µF sur le rail 5 V
+- LED: `GPIO8` (WS2812)
+- Antenne: fil 17,3 cm (λ/4)
 
 ## Dépannage
 
-### Problème de compilation
+### Device ne s'inclut pas
+- Vérifier que le coordinateur est en "permit join"
+- Contrôler le canal Zigbee (11, 15, 20, 25)
+- Redémarrer Zigbee2MQTT
 
-Si `idf.py build` échoue avec "esp-zigbee-lib not found" :
+### Portes 433MHz ne répondent pas
+- Vérifier les clés CAME-24 dans le code
+- Ajuster les timings T_SHORT/T_LONG si nécessaire
+- Augmenter le nombre de répétitions
+- Contrôler l'antenne (17,3 cm)
+
+### OTA ne fonctionne pas
+- Vérifier SSID/mot de passe Wi-Fi
+- Contrôler que l'URL est joignable
+- Consulter les logs série pour plus de détails
+
+## Méthode vendoring (si nécessaire)
+
+Si le Component Manager pose problème :
 
 ```bash
-# Méthode 1 : Nettoyer et reconstruire
+# Cloner la librairie Zigbee
+git clone --recursive https://github.com/espressif/esp-zigbee-lib.git components/esp-zigbee-lib
+
+# Nettoyer et recompiler
 idf.py fullclean
+idf.py set-target esp32c6
 idf.py build
-
-# Méthode 2 : Forcer le téléchargement des composants
-rm -rf build/
-idf.py reconfigure
-idf.py build
-```
-
-### Problème de flash
-
-```bash
-# Vérifier le port série
-ls /dev/ttyUSB* /dev/ttyACM*
-
-# Flasher avec reset
-idf.py -p /dev/ttyUSB0 -b 460800 flash monitor
-```
-
-### Problème Wi-Fi OTA
-
-1. Vérifier les credentials dans `sdkconfig.defaults`
-2. Vérifier que l'URL OTA est accessible
-3. Consulter les logs : `idf.py monitor`
-
-## Structure du projet
-
-```
-zb433/
-├── CMakeLists.txt              # Configuration CMake principale
-├── idf_component.yml           # Dépendances Component Manager
-├── partitions.csv              # Table de partitions OTA
-├── sdkconfig.defaults          # Configuration par défaut
-├── build_and_flash.sh          # Script de build/flash
-├── README.md                   # Ce fichier
-└── main/
-    ├── CMakeLists.txt          # Configuration composant main
-    └── main.c                  # Code source principal
-```
-
-## Personnalisation
-
-### Modifier les clés CAME-24
-
-Dans `main.c`, lignes 50-51 :
-
-```c
-#define KEY_A  0x03B29B  // porte A (03 B2 9B)
-#define KEY_B  0x03B29A  // porte B (03 B2 9A)
-```
-
-### Modifier le GPIO TX
-
-Dans `main.c`, ligne 26 :
-
-```c
-#define TX433_GPIO GPIO_NUM_4   // DATA vers TX433
-```
-
-### Modifier les timings CAME-24
-
-Dans `main.c`, lignes 54-56 :
-
-```c
-#define T_SHORT   350    // µs
-#define T_LONG   1050    // µs  
-#define GAP_US   8000    // µs entre répétitions
 ```
 
 ## Licence
 
-MIT License - Voir le fichier LICENSE pour plus de détails.
+Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.

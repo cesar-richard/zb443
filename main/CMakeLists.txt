@@ -1,5 +1,6 @@
 idf_component_register(
-  SRCS "main.c"
-  REQUIRES nvs_flash esp_wifi esp_https_ota esp_http_client driver app_update espressif__esp-zigbee-lib espressif__esp-zboss-lib
+  SRCS "main.c" "zigbee.c" "led.c" "buttons.c" "came433.c" "cc1101.c"
+  REQUIRES esp-zigbee-lib
+  PRIV_REQUIRES nvs_flash driver esp_netif esp_event esp_coex led_strip
 )
 

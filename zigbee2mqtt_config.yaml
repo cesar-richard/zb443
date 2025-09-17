@@ -1,232 +1,54 @@
 # Configuration Zigbee2MQTT pour ZB433 Router
-# À ajouter dans votre configuration.yaml
 
-# ====== Configuration de base ======
-zigbee2mqtt:
-  # ... autres configurations existantes ...
-  
-  # Configuration spécifique pour ZB433
-  devices:
-    # Remplacer par l'IEEE de votre appareil après inclusion
-    '0x1234567890abcdef':  # IEEE Address de votre ZB433
-      friendly_name: 'ZB433-Router'
-      description: 'Routeur Zigbee ESP32-C6 CAME-24 + OTA'
-      retain: false
-      
-      # Configuration des endpoints
-      endpoints:
-        10:
-          friendly_name: 'ZB433-PorteA'
-          description: 'Commande porte A (CAME-24 0x03B29B)'
-        11:
-          friendly_name: 'ZB433-PorteB' 
-          description: 'Commande porte B (CAME-24 0x03B29A)'
-        13:
-          friendly_name: 'ZB433-OTA'
-          description: 'Déclencheur OTA + configuration URL'
-        14:
-          friendly_name: 'ZB433-Reset'
-          description: 'Factory Reset (efface NVS)'
+# Exemple de configuration pour le ZB433 Router
+# À ajouter dans votre configuration.yaml Zigbee2MQTT
 
-# ====== Automations Home Assistant ======
-# À ajouter dans automations.yaml
-
-# Configuration de l'URL OTA
-- alias: 'ZB433 - Configurer URL OTA'
-  description: 'Configure l\'URL OTA pour le ZB433'
-  trigger:
-    platform: state
-    entity_id: input_text.zb433_ota_url
-  action:
-    - service: mqtt.publish
-      data:
-        topic: 'zigbee2mqtt/ZB433-Router/13/basic/set'
-        payload: >
-          {
-            "0xF001": "{{ states('input_text.zb433_ota_url') }}",
-            "manufacturerCode": 4660
-          }
-        retain: false
-
-# Déclenchement OTA
-- alias: 'ZB433 - Déclencher OTA'
-  description: 'Déclenche la mise à jour OTA du ZB433'
-  trigger:
-    platform: state
-    entity_id: input_boolean.zb433_ota_trigger
-    to: 'on'
-  action:
-    - service: mqtt.publish
-      data:
-        topic: 'zigbee2mqtt/ZB433-Router/13/set'
-        payload: '{"state": "ON"}'
-        retain: false
-    - service: input_boolean.turn_off
-      entity_id: input_boolean.zb433_ota_trigger
-    - service: persistent_notification.create
-      data:
-        title: 'ZB433 OTA'
-        message: 'Mise à jour OTA déclenchée. L\'appareil va redémarrer.'
-
-# Factory Reset
-- alias: 'ZB433 - Factory Reset'
-  description: 'Remet l\'appareil en mode inclusion'
-  trigger:
-    platform: state
-    entity_id: input_boolean.zb433_factory_reset
-    to: 'on'
-  action:
-    - service: mqtt.publish
-      data:
-        topic: 'zigbee2mqtt/ZB433-Router/14/set'
-        payload: '{"state": "ON"}'
-        retain: false
-    - service: input_boolean.turn_off
-      entity_id: input_boolean.zb433_factory_reset
-    - service: persistent_notification.create
-      data:
-        title: 'ZB433 Factory Reset'
-        message: 'Factory Reset effectué. L\'appareil va redémarrer en mode inclusion.'
-
-# ====== Inputs pour l'interface ======
-# À ajouter dans configuration.yaml
-
-input_text:
-  zb433_ota_url:
-    name: 'URL OTA ZB433'
-    initial: 'http://homeassistant.local:8123/local/zb433.bin'
-    max: 255
-
-input_boolean:
-  zb433_ota_trigger:
-    name: 'Déclencher OTA ZB433'
-    icon: mdi:update
+# Device mapping
+devices:
+  '0x1234567890abcdef':  # Remplacez par l'adresse MAC de votre device
+    friendly_name: 'ZB433 Router'
+    description: 'ESP32-C6 Zigbee Router pour CAME-24'
+    model: 'ZB433-Router'
+    vendor: 'Custom'
+    supports: 'on/off'
     
-  zb433_factory_reset:
-    name: 'Factory Reset ZB433'
-    icon: mdi:restart-alert
+    # Endpoints
+    endpoints:
+      10:
+        friendly_name: 'Porte A'
+        description: 'Contrôle Porte A CAME-24'
+        cluster: 'on_off'
+        state: 'state'
+        command: 'set'
+        
+      11:
+        friendly_name: 'Porte B'
+        description: 'Contrôle Porte B CAME-24'
+        cluster: 'on_off'
+        state: 'state'
+        command: 'set'
+        
+      13:
+        friendly_name: 'OTA'
+        description: 'Déclenchement mise à jour OTA'
+        cluster: 'on_off'
+        state: 'state'
+        command: 'set'
+        
+      14:
+        friendly_name: 'Factory Reset'
+        description: 'Reset complet du device'
+        cluster: 'on_off'
+        state: 'state'
+        command: 'set'
 
-# ====== Interface Lovelace ======
-# À ajouter dans ui-lovelace.yaml ou via l'éditeur UI
+# MQTT Topics
+topics:
+  state: 'zigbee2mqtt/ZB433 Router/{endpoint}/state'
+  set: 'zigbee2mqtt/ZB433 Router/{endpoint}/set'
+  get: 'zigbee2mqtt/ZB433 Router/{endpoint}/get'
 
-# Card pour ZB433
-type: vertical-stack
-title: ZB433 Router
-cards:
-  - type: entities
-    title: Contrôles Portes
-    entities:
-      - entity: zigbee2mqtt.zb433_portea
-        name: Porte A
-        icon: mdi:gate
-      - entity: zigbee2mqtt.zb433_porteb
-        name: Porte B
-        icon: mdi:gate
-
-  - type: entities
-    title: Gestion Firmware
-    entities:
-      - entity: input_text.zb433_ota_url
-        name: URL OTA
-      - entity: input_boolean.zb433_ota_trigger
-        name: Déclencher OTA
-      - entity: input_boolean.zb433_factory_reset
-        name: Factory Reset
-
-# ====== Scripts utiles ======
-# À ajouter dans scripts.yaml
-
-zb433_open_door_a:
-  alias: 'Ouvrir Porte A'
-  sequence:
-    - service: mqtt.publish
-      data:
-        topic: 'zigbee2mqtt/ZB433-Router/10/set'
-        payload: '{"state": "ON"}'
-
-zb433_open_door_b:
-  alias: 'Ouvrir Porte B'
-  sequence:
-    - service: mqtt.publish
-      data:
-        topic: 'zigbee2mqtt/ZB433-Router/11/set'
-        payload: '{"state": "ON"}'
-
-zb433_ota_update:
-  alias: 'Mise à jour OTA ZB433'
-  sequence:
-    - service: input_boolean.turn_on
-      entity_id: input_boolean.zb433_ota_trigger
-
-zb433_factory_reset:
-  alias: 'Factory Reset ZB433'
-  sequence:
-    - service: input_boolean.turn_on
-      entity_id: input_boolean.zb433_factory_reset
-
-# ====== Exemple d'automation avancée ======
-# Ouverture automatique selon la présence
-
-- alias: 'Ouverture automatique porte A'
-  description: 'Ouvre la porte A quand quelqu\'un arrive'
-  trigger:
-    platform: state
-    entity_id: person.cesar  # Remplacer par votre personne
-    to: 'home'
-  condition:
-    condition: state
-    entity_id: sun.sun
-    state: 'below_horizon'  # Seulement le soir
-  action:
-    - service: script.zb433_open_door_a
-    - service: persistent_notification.create
-      data:
-        title: 'Porte A'
-        message: 'Porte A ouverte automatiquement'
-
-# ====== Template pour monitoring ======
-# À ajouter dans configuration.yaml
-
-template:
-  - sensor:
-      - name: "ZB433 Status"
-        state: >
-          {% if is_state('zigbee2mqtt.zb433_router', 'online') %}
-            Online
-          {% else %}
-            Offline
-          {% endif %}
-        icon: >
-          {% if is_state('zigbee2mqtt.zb433_router', 'online') %}
-            mdi:check-circle
-          {% else %}
-            mdi:alert-circle
-          {% endif %}
-
-# ====== Notifications ======
-# À ajouter dans configuration.yaml
-
-notify:
-  - name: zb433_notifications
-    platform: mqtt
-    topic: 'homeassistant/notifications/zb433'
-
-# ====== Exemple de webhook pour OTA ======
-# Pour déclencher OTA via webhook externe
-
-webhook:
-  zb433_ota:
-    - service: script.zb433_ota_update
-    - service: notify.zb433_notifications
-      data:
-        message: "OTA déclenché via webhook"
-
-# ====== Configuration MQTT ======
-# Si vous utilisez un broker MQTT externe
-
-mqtt:
-  # ... configuration MQTT existante ...
-  
-  # Topics spécifiques ZB433
-  discovery: true
-  discovery_prefix: homeassistant
+# Attributs manufacturer
+manufacturer_attributes:
+  0xF001: 'ota_url'
+  0xF002: 'device_info'

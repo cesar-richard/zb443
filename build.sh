@@ -109,7 +109,7 @@ build_project() {
     log "Compilation du projet..."
     
     # Vérifier les dépendances
-    if [ ! -f "idf_component.yml" ]; then
+    if [ ! -f "main/idf_component.yml" ]; then
         error "Fichier idf_component.yml manquant"
         exit 1
     fi
@@ -179,7 +179,7 @@ main() {
     
     case $choice in
         1)
-            set_target
+            # set_target
             build_project
             ;;
         2)
@@ -240,11 +240,11 @@ if [ $# -gt 0 ]; then
             shift
             ;;
         --build-only)
-            check_idf
-            set_target
-            if [ "$CLEAN" = true ]; then
-                clean_project
-            fi
+            # check_idf
+            # set_target
+            # if [ "$CLEAN" = true ]; then
+            #     clean_project
+            # fi
             build_project
             exit 0
             ;;

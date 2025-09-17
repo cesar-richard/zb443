@@ -1,0 +1,21 @@
+menu "ZB433 Configuration"
+
+    config ZB433_WIFI_SSID
+        string "Wi-Fi SSID"
+        default "YOUR_WIFI_SSID"
+        help
+            Wi-Fi network name
+
+    config ZB433_WIFI_PASS
+        string "Wi-Fi Password"
+        default "YOUR_WIFI_PASSWORD"
+        help
+            Wi-Fi network password
+
+    config ZB433_DEFAULT_OTA_URL
+        string "Default OTA URL"
+        default "http://homeassistant.local:8123/local/zb433.bin"
+        help
+            Default URL for OTA updates
+
+endmenu
