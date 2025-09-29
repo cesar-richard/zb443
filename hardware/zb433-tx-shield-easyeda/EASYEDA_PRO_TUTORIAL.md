@@ -67,5 +67,15 @@ Cible: ESP32‑C6‑DEV‑KIT‑N8 + Micro‑USB power‑only + FS1000A (5V) ave
 ## 8) Remarques
 - Le DevKit intègre sa régulation 5V→3V3 et l’USB de programmation: ton Micro‑USB sur le shield ne fait qu’alimenter en 5V.
 - Aucun D+/D− routé; aucun bouton nécessaire.
+- Avec ce driver NPN+PNP, `DATA_TX5V` est maintenu à 0 V (via `RPD`) quand `IO4` est bas; quand `IO4` passe haut, `Q1` tire la base de `Q2` bas et `Q2` force `DATA_TX5V` à +5 V.
+
+## 9) Firmware (logique / init)
+- Logique OOK: actif‑haut. `GPIO4=1` → `DATA_TX5V=+5V` (émission). `GPIO4=0` → `DATA_TX5V=0V` (repos, aucune émission).
+- Init GPIO: sortie push‑pull, sans pull‑up/down; niveau au repos bas.
+- Dans le code (`main/came433.c`):
+  - Démarrage et repos: `gpio_set_level(CAME_GPIO, 0);`
+  - Avant/Après transmission: forcer l’IDLE bas.
+  - L’encodeur RMT génère des impulsions hautes pour les « HIGH » du protocole CAME (LOW puis HIGH par bit, sync: long LOW puis court HIGH).
+- Si un jour tu inverses la topologie matérielle, il faudra inverser la polarité (niveau idle et niveaux dans l’encodeur).
 
 Done. Reprends le schéma en suivant ces étapes; tu devrais passer au PCB en <5 min.
