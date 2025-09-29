@@ -12,10 +12,10 @@ Le **ZB433 Router** est un routeur Zigbee ESP32-C6 capable de contrôler des por
 ### Fonctionnalités
 
 - **Routeur Zigbee 3.0** : Compatible avec Zigbee2MQTT
-- **Contrôle 433MHz CAME-24** : Deux clés (0x03B29B et 0x03B29A)
-- **Mises à jour OTA** : Mise à jour du firmware via Wi-Fi
-- **Factory Reset** : Retour à l'état d'inclusion via Zigbee
-- **4 Endpoints** : Porte A, Porte B, OTA, Factory Reset
+- **Contrôle 433MHz CAME-24** : Deux boutons (Portail Principal et Portail Parking)
+- **Identify**: cluster 0x0003 (IdentifyTime + TriggerEffect) avec effet LED
+- **Indicateur LED**: couleurs distinctes lors d’une commande
+- **2 Endpoints** : EP1 (Portail Principal), EP2 (Portail Parking)
 
 ## Installation
 
@@ -57,38 +57,35 @@ CONFIG_ZB433_DEFAULT_OTA_URL="http://homeassistant.local:8123/local/zb433.bin"
 ### Zigbee2MQTT
 
 1. Mettre le coordinateur en mode "permit join"
-2. L'appareil s'inclut automatiquement et expose 4 endpoints :
-   - **EP10** : Porte A (clé 0x03B29B)
-   - **EP11** : Porte B (clé 0x03B29A)  
-   - **EP13** : OTA Wi-Fi
-   - **EP14** : Factory Reset
+2. L'appareil s'inclut automatiquement et expose 2 endpoints :
+   - **EP1** : Portail Principal (code 0x03B29B)
+   - **EP2** : Portail Parking (code 0x03B29A)
+3. Identify (device): utiliser le cluster `genIdentify` sur EP1 (IdentifyTime/TriggerEffect)
 
 ### Exemple MQTT
 
 ```bash
-# Ouvrir Porte A
-mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/10/set" -m "ON"
+# Ouvrir Portail Principal (EP1)
+mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/1/set" -m '{"state":"ON"}'
 
-# Ouvrir Porte B
-mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/11/set" -m "ON"
+# Ouvrir Portail Parking (EP2)
+mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/2/set" -m '{"state":"ON"}'
 
-# Déclencher OTA
-mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/13/set" -m "ON"
-
-# Factory Reset
-mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/14/set" -m "ON"
+# Identify via attribut (EP1)
+mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/1/set" -m '{"write":{"cluster":"genIdentify","payload":{"identify_time":5}}}'
 ```
 
 ## Utilisation
 
 ### Endpoints disponibles
 
-| Endpoint | Fonction | Commande | Action |
-|----------|----------|----------|--------|
-| **EP10** | Porte A | `ON` | Transmission 433MHz (clé 0x03B29B) |
-| **EP11** | Porte B | `ON` | Transmission 433MHz (clé 0x03B29A) |
-| **EP13** | OTA | `ON` | Déclenchement mise à jour Wi-Fi |
-| **EP14** | Factory Reset | `ON` | Effacement NVS + redémarrage |
+| Endpoint | Fonction | Action |
+|----------|----------|--------|
+| **EP1** | Portail Principal | `state: ON` → TX 433MHz (0x03B29B) |
+| **EP2** | Portail Parking   | `state: ON` → TX 433MHz (0x03B29A) |
+
+Identify (device): via EP1 (`genIdentify.identify_time`, TriggerEffect).
+LED: EP1 bleu-cyan, EP2 magenta lors d’une commande.
 
 ### Procédure OTA
 
