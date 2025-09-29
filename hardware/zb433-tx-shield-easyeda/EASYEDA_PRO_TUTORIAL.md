@@ -71,9 +71,9 @@ Cible: ESP32‑C6‑DEV‑KIT‑N8 + Micro‑USB power‑only + FS1000A (5V) ave
 
 ## 9) Firmware (logique / init)
 - Logique OOK: actif‑haut. `GPIO4=1` → `DATA_TX5V=+5V` (émission). `GPIO4=0` → `DATA_TX5V=0V` (repos, aucune émission).
-- Init GPIO: sortie push‑pull, sans pull‑up/down; niveau au repos bas.
+- Init GPIO: sortie push‑pull, sans pull‑up/down; niveau au repos **bas (0)**.
 - Dans le code (`main/came433.c`):
-  - Démarrage et repos: `gpio_set_level(CAME_GPIO, 0);`
+  - Démarrage et repos: `gpio_set_level(CAME_GPIO, 0);` (idle bas)
   - Avant/Après transmission: forcer l’IDLE bas.
   - L’encodeur RMT génère des impulsions hautes pour les « HIGH » du protocole CAME (LOW puis HIGH par bit, sync: long LOW puis court HIGH).
 - Si un jour tu inverses la topologie matérielle, il faudra inverser la polarité (niveau idle et niveaux dans l’encodeur).
