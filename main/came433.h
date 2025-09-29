@@ -8,7 +8,7 @@
 // High-side driver NPN+PNP requires GPIO idle = LOW (0)
 #define CAME_GPIO 4                    // GPIO for CAME 433MHz TX (ESP32-C6 DevKit)
 #define CAME_CARRIER_FREQ 433920000    // 433.92 MHz
-#define CAME_REPEATS 30                // Number of repetitions per transmission
+#define CAME_REPEATS 0                 // Number of repetitions per transmission
 
 // ====== CAME Protocol Keys ======
 #define KEY_A  0x0003B29B  // Portail principal (24 bits)

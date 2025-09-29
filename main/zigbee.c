@@ -1,12 +1,25 @@
 #include "zigbee.h"
 #include "endpoints.h"
+#include "led.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "zcl/esp_zigbee_zcl_command.h"
 #include "aps/esp_zigbee_aps.h"
+#include "zcl/esp_zigbee_zcl_identify.h"
 
 static const char *TAG = "ZIGBEE";
+
+// Identify notify (called by stack on Identify start/stop)
+static void identify_notify_cb(uint8_t identify_on)
+{
+    ESP_LOGI(TAG, "Identify notify: %s", identify_on ? "start" : "stop");
+    if (identify_on) {
+        led_identify_breathe();
+    } else {
+        led_identify_okay();
+    }
+}
 
 // ====== Zigbee Task ======
 static void zigbee_task(void *pvParameters)
@@ -57,6 +70,10 @@ void zigbee_init(void)
     
     // Create endpoints
     create_endpoints();
+
+    // Register Identify notify handlers (per endpoint)
+    esp_zb_identify_notify_handler_register(BUTTON_1_ENDPOINT, identify_notify_cb);
+    esp_zb_identify_notify_handler_register(BUTTON_2_ENDPOINT, identify_notify_cb);
     
     // Register action handler
     esp_zb_core_action_handler_register(zb_action_handler);
@@ -99,7 +116,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
         ESP_LOGI(TAG, "Zigbee: Device left network");
         break;
     default:
-        ESP_LOGD(TAG, "Zigbee: Unhandled signal %d, status: %s", sig_type, esp_err_to_name(status));
+        ESP_LOGI(TAG, "Zigbee: Unhandled signal %d, status: %s", sig_type, esp_err_to_name(status));
         break;
     }
 }
@@ -110,8 +127,6 @@ esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const 
     esp_err_t ret = ESP_OK;
     switch (callback_id) {
     case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
-        // Handle attribute changes (button clicks)
-        ESP_LOGI(TAG, "Zigbee attribute changed - button click detected");
         
         // Détecter quel endpoint a été cliqué
         esp_zb_zcl_set_attr_value_message_t *attr_msg = (esp_zb_zcl_set_attr_value_message_t *)message;
@@ -128,6 +143,22 @@ esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const 
             handle_button_click(BUTTON_2_ENDPOINT);
         } else {
             ESP_LOGW(TAG, "Unknown endpoint clicked: %d", endpoint);
+        }
+
+        // Identify cluster: react to identify_time writes and play LED effect
+        if (attr_msg->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY &&
+            attr_msg->attribute.id == ESP_ZB_ZCL_ATTR_IDENTIFY_IDENTIFY_TIME_ID) {
+            uint16_t identify_seconds = 0;
+            if (attr_msg->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_U16 &&
+                attr_msg->attribute.data.value != NULL) {
+                identify_seconds = *(uint16_t *)attr_msg->attribute.data.value;
+            }
+            ESP_LOGI(TAG, "Identify requested on EP%d for %u s (attr write)", endpoint, (unsigned)identify_seconds);
+            if (identify_seconds > 0) {
+                led_identify_breathe();
+            } else {
+                led_identify_okay();
+            }
         }
         break;
     default:

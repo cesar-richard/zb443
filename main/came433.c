@@ -147,18 +147,8 @@ void came433_init(void)
     ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &came_tx_channel));
 
     // Configure RMT encoder
-    rmt_bytes_encoder_config_t bytes_encoder_config = {
-        .bit0 = {
-            .level0 = 1,
-            .duration0 = 1, // Will be overridden by our symbols
-        },
-        .bit1 = {
-            .level0 = 1,
-            .duration0 = 1, // Will be overridden by our symbols
-        },
-        .flags.msb_first = 1,
-    };
-    ESP_ERROR_CHECK(rmt_new_bytes_encoder(&bytes_encoder_config, &came_encoder));
+    rmt_copy_encoder_config_t copy_encoder_config = {};
+    ESP_ERROR_CHECK(rmt_new_copy_encoder(&copy_encoder_config, &came_encoder));
 
     ESP_LOGI(TAG, "CAME 433MHz transmitter initialized successfully");
 }

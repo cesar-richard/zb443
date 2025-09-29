@@ -12,16 +12,12 @@
 
 // ====== Zigbee Configuration ======
 #define ESP_ZB_AF_HA_PROFILE_ID 0x0104
-#define ESP_ZB_HA_REMOTE_CONTROL_DEVICE_ID 0x0006
-#define ZIGBEE_ROUTER_ENDPOINT 1
 
 // ====== Function Prototypes ======
 void zigbee_init(void);
 void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct);
 esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const void *message);
 
-// Reporting helpers
-void zb_report_onoff(uint8_t endpoint, bool value);
 void create_endpoints(void);
 
 #endif // ZIGBEE_H

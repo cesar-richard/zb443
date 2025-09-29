@@ -41,13 +41,6 @@ void led_off(void)
     ESP_ERROR_CHECK(led_strip_clear(led_strip));
 }
 
-void led_blink(uint32_t red, uint32_t green, uint32_t blue, uint32_t duration_ms)
-{
-    led_set_color(red, green, blue);
-    vTaskDelay(pdMS_TO_TICKS(duration_ms));
-    led_off();
-}
-
 // ====== Identify LED Effects ======
 void led_identify_blink(void)
 {

@@ -18,7 +18,7 @@ void app_main(void)
     
     // Initialize LED
     led_init();
-    led_off();
+    led_set_color(255, 0, 0);
 
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
@@ -28,18 +28,13 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    // Initialize CAME 433MHz transmitter
-    ESP_LOGI(TAG, "Initializing CAME 433MHz transmitter...");
     came433_init();
-    ESP_LOGI(TAG, "CAME 433MHz transmitter ready!");
-    
-    // Initialize Zigbee
-    ESP_LOGI(TAG, "Initializing Zigbee...");
     zigbee_init();
-    ESP_LOGI(TAG, "Zigbee initialized");
     
     // Wait for Zigbee stack to be ready
     vTaskDelay(pdMS_TO_TICKS(500));
+
+    led_set_color(255, 64, 0);
     
     // Start commissioning if needed
     if (esp_zb_bdb_is_factory_new()) {
@@ -52,18 +47,15 @@ void app_main(void)
         esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
     }
     
-    ESP_LOGI(TAG, "ZB433 Router ready!");
-    ESP_LOGI(TAG, "Button 1: EP%d (Portail Principal)", BUTTON_1_ENDPOINT);
-    ESP_LOGI(TAG, "Button 2: EP%d (Portail Parking)", BUTTON_2_ENDPOINT);
-    
     // Main loop
     bool zigbee_connected = false;
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        vTaskDelay(pdMS_TO_TICKS(5000));
         
         // Check Zigbee connection status
         if (!zigbee_connected && esp_zb_bdb_dev_joined()) {
             ESP_LOGI(TAG, "Zigbee connected");
+            led_off();
             zigbee_connected = true;
         }
     }

@@ -12,7 +12,6 @@
 void led_init(void);
 void led_set_color(uint32_t red, uint32_t green, uint32_t blue);
 void led_off(void);
-void led_blink(uint32_t red, uint32_t green, uint32_t blue, uint32_t duration_ms);
 
 // ====== Identify LED Effects ======
 void led_identify_blink(void);
