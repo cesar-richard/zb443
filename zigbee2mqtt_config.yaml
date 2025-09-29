@@ -12,37 +12,23 @@ devices:
     vendor: 'Custom'
     supports: 'on/off'
     
-    # Endpoints
+    # Endpoints (alignés sur firmware: EP1 et EP2)
     endpoints:
-      10:
-        friendly_name: 'Porte A'
-        description: 'Contrôle Porte A CAME-24'
+      1:
+        friendly_name: 'Portail Principal'
+        description: 'Contrôle Portail Principal (CAME-24)'
         cluster: 'on_off'
         state: 'state'
         command: 'set'
         
-      11:
-        friendly_name: 'Porte B'
-        description: 'Contrôle Porte B CAME-24'
-        cluster: 'on_off'
-        state: 'state'
-        command: 'set'
-        
-      13:
-        friendly_name: 'OTA'
-        description: 'Déclenchement mise à jour OTA'
-        cluster: 'on_off'
-        state: 'state'
-        command: 'set'
-        
-      14:
-        friendly_name: 'Factory Reset'
-        description: 'Reset complet du device'
+      2:
+        friendly_name: 'Portail Parking'
+        description: 'Contrôle Portail Parking (CAME-24)'
         cluster: 'on_off'
         state: 'state'
         command: 'set'
 
-# MQTT Topics
+# MQTT Topics (exemple)
 topics:
   state: 'zigbee2mqtt/ZB433 Router/{endpoint}/state'
   set: 'zigbee2mqtt/ZB433 Router/{endpoint}/set'
