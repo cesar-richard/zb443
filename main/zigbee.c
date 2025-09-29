@@ -116,7 +116,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
         ESP_LOGI(TAG, "Zigbee: Device left network");
         break;
     default:
-        ESP_LOGI(TAG, "Zigbee: Unhandled signal %d, status: %s", sig_type, esp_err_to_name(status));
+        ESP_LOGD(TAG, "Zigbee: Unhandled signal %d, status: %s", sig_type, esp_err_to_name(status));
         break;
     }
 }

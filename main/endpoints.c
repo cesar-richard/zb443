@@ -182,14 +182,15 @@ void create_endpoints(void)
 // ====== Button Click Detection ======
 void handle_button_click(uint8_t endpoint)
 {
-    led_set_color(0, 0, 255);
     switch (endpoint) {
     case BUTTON_1_ENDPOINT:
         ESP_LOGI(TAG, "Button 1 clicked - Portail Principal");
+        led_set_color(0, 128, 255);
         came433_send_portail1();
         break;
     case BUTTON_2_ENDPOINT:
         ESP_LOGI(TAG, "Button 2 clicked - Portail Parking");
+        led_set_color(255, 0, 255);
         came433_send_portail2();
         break;
     default:
