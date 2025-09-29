@@ -7,7 +7,7 @@
 
 #include "zigbee.h"
 #include "led.h"
-#include "buttons.h"
+#include "endpoints.h"
 #include "came433.h"
 
 #define TAG "ZB433"
@@ -18,7 +18,7 @@ void app_main(void)
     
     // Initialize LED
     led_init();
-    led_set_color(255, 0, 0); // Red LED to indicate Zigbee is not connected yet
+    led_off();
 
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
@@ -44,14 +44,11 @@ void app_main(void)
     // Start commissioning if needed
     if (esp_zb_bdb_is_factory_new()) {
         ESP_LOGI(TAG, "Device is factory new - starting commissioning");
-        led_zigbee_connecting();
         esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
     } else if (esp_zb_bdb_dev_joined()) {
         ESP_LOGI(TAG, "Device already joined to network");
-        led_zigbee_connected();
     } else {
         ESP_LOGI(TAG, "Device not joined - starting commissioning");
-        led_zigbee_connecting();
         esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
     }
     
@@ -67,7 +64,6 @@ void app_main(void)
         // Check Zigbee connection status
         if (!zigbee_connected && esp_zb_bdb_dev_joined()) {
             ESP_LOGI(TAG, "Zigbee connected");
-            led_zigbee_connected();
             zigbee_connected = true;
         }
     }

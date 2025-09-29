@@ -8,7 +8,7 @@
 #include "esp_zigbee_endpoint.h"
 #include "platform/esp_zigbee_platform.h"
 #include "ha/esp_zigbee_ha_standard.h"
-#include "buttons.h"
+#include "endpoints.h"
 
 // ====== Zigbee Configuration ======
 #define ESP_ZB_AF_HA_PROFILE_ID 0x0104

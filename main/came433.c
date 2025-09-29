@@ -11,6 +11,12 @@
 
 static const char *TAG = "CAME433";
 
+/*
+Hardware: High-side driver NPN+PNP (2N2222A + 2N2907A)
+- Idle (no TX): GPIO=0 → NPN OFF → PNP base pulled up by RB_PNP → PNP OFF → DATA pulled down by RPD
+- Active (TX): GPIO=1 → NPN ON → PNP base driven low → PNP ON → DATA = +5V (OOK active-high)
+Firmware requirement: keep GPIO low at startup and after transmission.
+*/
 // ====== RMT Configuration ======
 static rmt_channel_handle_t came_tx_channel = NULL;
 static rmt_encoder_handle_t came_encoder = NULL;
@@ -66,8 +72,8 @@ static void came_send_came_code(uint32_t code, uint8_t repeats)
 {
     ESP_LOGI(TAG, "Sending CAME code: 0x%06X (%d repeats)", (unsigned int)code, repeats);
     
-    // Ensure transmitter is OFF in idle state
-    (void)gpio_set_level(CAME_GPIO, 1);
+    // Ensure transmitter is OFF in idle state (idle LOW with high-side driver)
+    (void)gpio_set_level(CAME_GPIO, 0);
     ESP_ERROR_CHECK(rmt_enable(came_tx_channel));
 
     // Calculate symbol count: sync + 24 bits per repeat
@@ -105,8 +111,8 @@ static void came_send_came_code(uint32_t code, uint8_t repeats)
 
     free(symbols);
 
-    // Return to idle and disable channel
-    (void)gpio_set_level(CAME_GPIO, 1);
+    // Return to idle (LOW) and disable channel
+    (void)gpio_set_level(CAME_GPIO, 0);
     ESP_ERROR_CHECK(rmt_disable(came_tx_channel));
     ESP_LOGI(TAG, "CAME code transmitted successfully");
 }
@@ -127,8 +133,8 @@ void came433_init(void)
     };
     ESP_ERROR_CHECK(gpio_config(&io_conf));
     
-    // Ensure transmitter is OFF at startup
-    ESP_ERROR_CHECK(gpio_set_level(CAME_GPIO, 1));
+    // Ensure transmitter is OFF at startup (idle LOW)
+    ESP_ERROR_CHECK(gpio_set_level(CAME_GPIO, 0));
 
     // Configure RMT TX channel
     rmt_tx_channel_config_t tx_chan_config = {
