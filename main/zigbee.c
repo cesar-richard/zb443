@@ -4,12 +4,17 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/timers.h"
 #include "zcl/esp_zigbee_zcl_command.h"
 #include "aps/esp_zigbee_aps.h"
 #include "zcl/esp_zigbee_zcl_identify.h"
 #include "zcl/esp_zigbee_zcl_on_off.h"
 
 static const char *TAG = "ZIGBEE";
+
+// Timers pour reset l'état on_off après 5 secondes (debounce)
+static TimerHandle_t reset_timer_ep1 = NULL;
+static TimerHandle_t reset_timer_ep2 = NULL;
 
 // Identify notify (called by stack on Identify start/stop)
 static void identify_notify_cb(uint8_t identify_on)
@@ -19,6 +24,60 @@ static void identify_notify_cb(uint8_t identify_on)
         led_identify_breathe();
     } else {
         led_identify_okay();
+    }
+}
+
+// Callback pour reset l'attribut on_off à false après 5 secondes
+static void reset_on_off_timer_callback(TimerHandle_t xTimer)
+{
+    uint8_t endpoint = (uint8_t)pvTimerGetTimerID(xTimer);
+    
+    ESP_LOGI(TAG, "Resetting on_off attribute to false on endpoint %d", endpoint);
+    
+    // Remettre l'attribut on_off à false
+    uint8_t on_off_value = 0; // false
+    esp_err_t ret = esp_zb_zcl_set_attribute_val(
+        endpoint,
+        ESP_ZB_ZCL_CLUSTER_ID_ON_OFF,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
+        &on_off_value,
+        false  // manufacturer specific = false
+    );
+    
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to reset on_off attribute on endpoint %d: %s", endpoint, esp_err_to_name(ret));
+    } else {
+        ESP_LOGI(TAG, "Successfully reset on_off attribute on endpoint %d", endpoint);
+    }
+}
+
+// Fonction pour lancer/relancer le timer de reset (avec debounce)
+static void start_reset_timer(uint8_t endpoint)
+{
+    TimerHandle_t *timer = (endpoint == BUTTON_1_ENDPOINT) ? &reset_timer_ep1 : &reset_timer_ep2;
+    
+    // Si le timer existe déjà, le relancer (debounce)
+    if (*timer != NULL) {
+        xTimerReset(*timer, 0);
+        ESP_LOGD(TAG, "Reset timer restarted for endpoint %d", endpoint);
+    } else {
+        // Créer le timer s'il n'existe pas encore
+        *timer = xTimerCreate(
+            endpoint == BUTTON_1_ENDPOINT ? "ResetEP1" : "ResetEP2",
+            pdMS_TO_TICKS(5000),  // 5 secondes
+            pdFALSE,              // One-shot timer
+            (void *)(uintptr_t)endpoint,  // Timer ID = endpoint
+            reset_on_off_timer_callback
+        );
+        
+        if (*timer == NULL) {
+            ESP_LOGE(TAG, "Failed to create reset timer for endpoint %d", endpoint);
+            return;
+        }
+        
+        xTimerStart(*timer, 0);
+        ESP_LOGD(TAG, "Reset timer started for endpoint %d", endpoint);
     }
 }
 
@@ -148,9 +207,13 @@ esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const 
                     if (endpoint == BUTTON_1_ENDPOINT) {
                         ESP_LOGI(TAG, "Button 1 clicked - Portail Principal");
                         handle_button_click(BUTTON_1_ENDPOINT);
+                        // Lancer le timer pour reset on_off après 5 secondes (debounce)
+                        start_reset_timer(BUTTON_1_ENDPOINT);
                     } else if (endpoint == BUTTON_2_ENDPOINT) {
                         ESP_LOGI(TAG, "Button 2 clicked - Portail Parking");
                         handle_button_click(BUTTON_2_ENDPOINT);
+                        // Lancer le timer pour reset on_off après 5 secondes (debounce)
+                        start_reset_timer(BUTTON_2_ENDPOINT);
                     } else {
                         ESP_LOGW(TAG, "Unknown endpoint clicked: %d", endpoint);
                     }
@@ -176,9 +239,13 @@ esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const 
                 if (endpoint == BUTTON_1_ENDPOINT) {
                     ESP_LOGI(TAG, "Button 1 clicked - Portail Principal");
                     handle_button_click(BUTTON_1_ENDPOINT);
+                    // Lancer le timer pour reset on_off après 5 secondes (debounce)
+                    start_reset_timer(BUTTON_1_ENDPOINT);
                 } else if (endpoint == BUTTON_2_ENDPOINT) {
                     ESP_LOGI(TAG, "Button 2 clicked - Portail Parking");
                     handle_button_click(BUTTON_2_ENDPOINT);
+                    // Lancer le timer pour reset on_off après 5 secondes (debounce)
+                    start_reset_timer(BUTTON_2_ENDPOINT);
                 } else {
                     ESP_LOGW(TAG, "Unknown endpoint clicked: %d", endpoint);
                 }
