@@ -8,7 +8,7 @@
 
 // ====== Button/Endpoint Configuration ======
 #define ESP_ZB_AF_HA_PROFILE_ID 0x0104
-// Use On/Off Switch device id for remote-like stateless buttons
+// Use On/Off Switch device id (was working before, try with Multistate Input)
 #define ESP_ZB_HA_ON_OFF_SWITCH_DEVICE_ID 0x0003
 #define BUTTON_1_ENDPOINT 1
 #define BUTTON_2_ENDPOINT 2

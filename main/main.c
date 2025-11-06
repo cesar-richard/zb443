@@ -32,9 +32,14 @@ void app_main(void)
     zigbee_init();
     
     // Wait for Zigbee stack to be ready
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(1000));
 
     led_set_color(255, 64, 0);
+    
+    // Force factory reset if not joined (uncomment to force reset)
+    // ESP_LOGI(TAG, "Forcing factory reset...");
+    // esp_zb_factory_reset();
+    // vTaskDelay(pdMS_TO_TICKS(2000));
     
     // Start commissioning if needed
     if (esp_zb_bdb_is_factory_new()) {

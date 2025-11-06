@@ -7,6 +7,7 @@
 #include "zcl/esp_zigbee_zcl_command.h"
 #include "aps/esp_zigbee_aps.h"
 #include "zcl/esp_zigbee_zcl_identify.h"
+#include "zcl/esp_zigbee_zcl_on_off.h"
 
 static const char *TAG = "ZIGBEE";
 
@@ -126,38 +127,77 @@ esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t callback_id, const 
 {
     esp_err_t ret = ESP_OK;
     switch (callback_id) {
-    case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
-        
-        // Détecter quel endpoint a été cliqué
-        esp_zb_zcl_set_attr_value_message_t *attr_msg = (esp_zb_zcl_set_attr_value_message_t *)message;
-        uint8_t endpoint = attr_msg->info.dst_endpoint;
-        
-        ESP_LOGI(TAG, "Button clicked on endpoint %d", endpoint);
-        
-        // Gérer le clic selon l'endpoint
-        if (endpoint == BUTTON_1_ENDPOINT) {
-            ESP_LOGI(TAG, "Button 1 clicked - Portail Principal");
-            handle_button_click(BUTTON_1_ENDPOINT);
-        } else if (endpoint == BUTTON_2_ENDPOINT) {
-            ESP_LOGI(TAG, "Button 2 clicked - Portail Parking");
-            handle_button_click(BUTTON_2_ENDPOINT);
-        } else {
-            ESP_LOGW(TAG, "Unknown endpoint clicked: %d", endpoint);
-        }
-
-        // Identify cluster: react to identify_time writes and play LED effect
-        if (attr_msg->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY &&
-            attr_msg->attribute.id == ESP_ZB_ZCL_ATTR_IDENTIFY_IDENTIFY_TIME_ID) {
-            uint16_t identify_seconds = 0;
-            if (attr_msg->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_U16 &&
-                attr_msg->attribute.data.value != NULL) {
-                identify_seconds = *(uint16_t *)attr_msg->attribute.data.value;
+    case ESP_ZB_CORE_CMD_CUSTOM_CLUSTER_REQ_CB_ID:
+        {
+            // Gérer les commandes On/Off (on, off, toggle)
+            esp_zb_zcl_custom_cluster_command_message_t *cmd_msg = (esp_zb_zcl_custom_cluster_command_message_t *)message;
+            uint8_t endpoint = cmd_msg->info.dst_endpoint;
+            uint16_t cluster = cmd_msg->info.cluster;
+            uint8_t command_id = cmd_msg->info.command.id;
+            
+            ESP_LOGI(TAG, "Command received: cluster=0x%04x, cmd=0x%02x, endpoint=%d", 
+                     cluster, command_id, endpoint);
+            
+            // On/Off cluster: react to on/off/toggle commands
+            if (cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF) {
+                if (command_id == ESP_ZB_ZCL_CMD_ON_OFF_ON_ID || 
+                    command_id == ESP_ZB_ZCL_CMD_ON_OFF_TOGGLE_ID) {
+                    ESP_LOGI(TAG, "On/Off command (on/toggle) on endpoint %d", endpoint);
+                    
+                    // Gérer le clic selon l'endpoint
+                    if (endpoint == BUTTON_1_ENDPOINT) {
+                        ESP_LOGI(TAG, "Button 1 clicked - Portail Principal");
+                        handle_button_click(BUTTON_1_ENDPOINT);
+                    } else if (endpoint == BUTTON_2_ENDPOINT) {
+                        ESP_LOGI(TAG, "Button 2 clicked - Portail Parking");
+                        handle_button_click(BUTTON_2_ENDPOINT);
+                    } else {
+                        ESP_LOGW(TAG, "Unknown endpoint clicked: %d", endpoint);
+                    }
+                }
             }
-            ESP_LOGI(TAG, "Identify requested on EP%d for %u s (attr write)", endpoint, (unsigned)identify_seconds);
-            if (identify_seconds > 0) {
-                led_identify_breathe();
-            } else {
-                led_identify_okay();
+        }
+        break;
+        
+    case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID:
+        {
+            esp_zb_zcl_set_attr_value_message_t *attr_msg = (esp_zb_zcl_set_attr_value_message_t *)message;
+            uint8_t endpoint = attr_msg->info.dst_endpoint;
+            
+            ESP_LOGI(TAG, "Attribute write: cluster=0x%04x, attr=0x%04x, endpoint=%d", 
+                     attr_msg->info.cluster, attr_msg->attribute.id, endpoint);
+            
+            // On/Off cluster: react to on_off attribute writes (fallback)
+            if (attr_msg->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF &&
+                attr_msg->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID) {
+                ESP_LOGI(TAG, "On/Off value changed on endpoint %d", endpoint);
+                
+                // Gérer le clic selon l'endpoint
+                if (endpoint == BUTTON_1_ENDPOINT) {
+                    ESP_LOGI(TAG, "Button 1 clicked - Portail Principal");
+                    handle_button_click(BUTTON_1_ENDPOINT);
+                } else if (endpoint == BUTTON_2_ENDPOINT) {
+                    ESP_LOGI(TAG, "Button 2 clicked - Portail Parking");
+                    handle_button_click(BUTTON_2_ENDPOINT);
+                } else {
+                    ESP_LOGW(TAG, "Unknown endpoint clicked: %d", endpoint);
+                }
+            }
+            
+            // Identify cluster: react to identify_time writes and play LED effect
+            if (attr_msg->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_IDENTIFY &&
+                attr_msg->attribute.id == ESP_ZB_ZCL_ATTR_IDENTIFY_IDENTIFY_TIME_ID) {
+                uint16_t identify_seconds = 0;
+                if (attr_msg->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_U16 &&
+                    attr_msg->attribute.data.value != NULL) {
+                    identify_seconds = *(uint16_t *)attr_msg->attribute.data.value;
+                }
+                ESP_LOGI(TAG, "Identify requested on EP%d for %u s (attr write)", endpoint, (unsigned)identify_seconds);
+                if (identify_seconds > 0) {
+                    led_identify_breathe();
+                } else {
+                    led_identify_okay();
+                }
             }
         }
         break;

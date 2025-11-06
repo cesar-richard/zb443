@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "zcl/esp_zigbee_zcl_basic.h"
+#include "zcl/esp_zigbee_zcl_on_off.h"
 
 static const char *TAG = "BUTTONS";
 
@@ -37,7 +38,7 @@ esp_zb_cluster_list_t *create_button_clusters(void)
     esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_LOCATION_DESCRIPTION_ID, BASIC_EMPTY_LABEL);
     esp_zb_cluster_list_add_basic_cluster(cluster_list, basic_attr_list, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
     
-    // On/Off cluster for button (to accept ON commands from Z2M)
+    // On/Off cluster (fonctionne pour l'appairage, on utilisera le converter pour exposer comme multistate choice)
     esp_zb_on_off_cluster_cfg_t on_off_cfg = {
         .on_off = false
     };
@@ -86,7 +87,7 @@ void create_endpoints(void)
 {
     esp_zb_ep_list_t *ep_list = esp_zb_ep_list_create();
     
-    // Button 1 endpoint (On/Off Switch - Portail Principal) with Identify
+    // Button 1 endpoint (Multistate Input - Portail Principal) with Identify
     esp_zb_cluster_list_t *button1_clusters = create_button_clusters();
     esp_zb_endpoint_config_t button1_config = {
         .endpoint = BUTTON_1_ENDPOINT,
@@ -96,7 +97,7 @@ void create_endpoints(void)
     };
     esp_zb_ep_list_add_ep(ep_list, button1_clusters, button1_config);
     
-    // Button 2 endpoint (On/Off Switch - Portail Parking) without Identify
+    // Button 2 endpoint (Multistate Input - Portail Parking) without Identify
     esp_zb_cluster_list_t *button2_clusters = create_button_clusters_no_identify();
     esp_zb_endpoint_config_t button2_config = {
         .endpoint = BUTTON_2_ENDPOINT,
