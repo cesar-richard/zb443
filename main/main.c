@@ -35,33 +35,12 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     led_set_color(255, 64, 0);
-    
-    // Force factory reset if not joined (uncomment to force reset)
-    // ESP_LOGI(TAG, "Forcing factory reset...");
-    // esp_zb_factory_reset();
-    // vTaskDelay(pdMS_TO_TICKS(2000));
-    
-    // Start commissioning if needed
-    if (esp_zb_bdb_is_factory_new()) {
-        ESP_LOGI(TAG, "Device is factory new - starting commissioning");
-        esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
-    } else if (esp_zb_bdb_dev_joined()) {
-        ESP_LOGI(TAG, "Device already joined to network");
-    } else {
-        ESP_LOGI(TAG, "Device not joined - starting commissioning");
-        esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
-    }
-    
-    // Main loop
-    bool zigbee_connected = false;
+
+    // Commissioning is now handled automatically by the signal handler
+    ESP_LOGI(TAG, "Zigbee stack started - commissioning handled by signal handler");
+
+    // Main loop - connection status is logged by signal handler
     while (1) {
         vTaskDelay(pdMS_TO_TICKS(5000));
-        
-        // Check Zigbee connection status
-        if (!zigbee_connected && esp_zb_bdb_dev_joined()) {
-            ESP_LOGI(TAG, "Zigbee connected");
-            led_off();
-            zigbee_connected = true;
-        }
     }
 }

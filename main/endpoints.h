@@ -14,7 +14,6 @@
 #define BUTTON_2_ENDPOINT 2
 
 // ====== Function Prototypes ======
-esp_zb_cluster_list_t *create_button_clusters(void);
 void create_endpoints(void);
 void handle_button_click(uint8_t endpoint);
 

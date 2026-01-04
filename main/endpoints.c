@@ -3,6 +3,7 @@
 #include "came433.h"
 #include "zigbee.h"
 #include "esp_log.h"
+#include "esp_check.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "zcl/esp_zigbee_zcl_basic.h"
@@ -10,56 +11,36 @@
 
 static const char *TAG = "BUTTONS";
 
-// Basic cluster strings (ZCL char strings: length + bytes)
-static uint8_t BASIC_MANUFACTURER[] = {16, 'C','e','s','a','r', ' ', 'R', 'I', 'C', 'H', 'A', 'R', 'D', ' ', 'E', 'I'};
-static uint8_t BASIC_MODEL[] = {12, 'Z','B','4','3','3','-','R','o','u','t','e','r'};
-static uint8_t BASIC_EP1_LABEL[] = {17, 'P','o','r','t','a','i','l',' ','P','r','i','n','c','i','p','a','l'};
-static uint8_t BASIC_EP2_LABEL[] = {15, 'P','o','r','t','a','i','l',' ','P','a','r','k','i','n','g'};
-static uint8_t BASIC_SW_BUILD[] = {5, '1','.','0','.','0'}; // softwareBuildId = "1.0.0"
-static uint8_t BASIC_EMPTY_LABEL[] = {0};
+// Manufacturer info (ZCL char strings: length byte + chars)
+static uint8_t MANUFACTURER_NAME[] = {16, 'C','e','s','a','r',' ','R','I','C','H','A','R','D',' ','E','I'};
+static uint8_t MODEL_IDENTIFIER[] = {12, 'Z','B','4','3','3','-','R','o','u','t','e','r'};
 
-// ====== Button Clusters ======
-esp_zb_cluster_list_t *create_button_clusters(void)
+// Helper to add manufacturer info to endpoint (inline implementation of esp_zcl_utility)
+static esp_err_t add_manufacturer_info(esp_zb_ep_list_t *ep_list, uint8_t endpoint_id)
 {
-    esp_zb_cluster_list_t *cluster_list = esp_zb_zcl_cluster_list_create();
-    
-    // Basic cluster for button
-    esp_zb_basic_cluster_cfg_t basic_cfg = {
-        .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
-        .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_DC_SOURCE
-    };
-    
-    esp_zb_attribute_list_t *basic_attr_list = esp_zb_basic_cluster_create(&basic_cfg);
-    // Add optional Basic attributes so Z2M can read them
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, BASIC_MANUFACTURER);
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, BASIC_MODEL);
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_SW_BUILD_ID, BASIC_SW_BUILD);
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_PRODUCT_LABEL_ID, BASIC_EMPTY_LABEL);
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_LOCATION_DESCRIPTION_ID, BASIC_EMPTY_LABEL);
-    esp_zb_cluster_list_add_basic_cluster(cluster_list, basic_attr_list, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-    
-    // On/Off cluster (fonctionne pour l'appairage, on utilisera le converter pour exposer comme multistate choice)
-    esp_zb_on_off_cluster_cfg_t on_off_cfg = {
-        .on_off = false
-    };
+    esp_zb_cluster_list_t *cluster_list = esp_zb_ep_list_get_ep(ep_list, endpoint_id);
+    ESP_RETURN_ON_FALSE(cluster_list, ESP_ERR_INVALID_ARG, TAG, "Failed to find endpoint %d", endpoint_id);
 
-    esp_zb_attribute_list_t *on_off_attr_list = esp_zb_on_off_cluster_create(&on_off_cfg);
-    esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_attr_list, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-    
-    // Identify cluster for EP1
-    esp_zb_identify_cluster_cfg_t identify_cfg = {
-        .identify_time = 0
-    };
-    esp_zb_attribute_list_t *identify_attr_list = esp_zb_identify_cluster_create(&identify_cfg);
-    esp_zb_cluster_list_add_identify_cluster(cluster_list, identify_attr_list, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
-    
-    return cluster_list;
+    esp_zb_attribute_list_t *basic_cluster = esp_zb_cluster_list_get_cluster(cluster_list, ESP_ZB_ZCL_CLUSTER_ID_BASIC, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    ESP_RETURN_ON_FALSE(basic_cluster, ESP_ERR_INVALID_ARG, TAG, "Failed to find basic cluster");
+
+    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, MANUFACTURER_NAME));
+    ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic_cluster, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, MODEL_IDENTIFIER));
+
+    return ESP_OK;
 }
 
-// Helper: cluster list without Identify (for EP2)
-static esp_zb_cluster_list_t *create_button_clusters_no_identify(void)
+
+// ====== Endpoint Creation ======
+void create_endpoints(void)
 {
-    esp_zb_cluster_list_t *cluster_list = esp_zb_zcl_cluster_list_create();
+    // Create EP1 (Portail Principal) using ESP-Zigbee helper
+    esp_zb_on_off_switch_cfg_t switch_cfg = ESP_ZB_DEFAULT_ON_OFF_SWITCH_CONFIG();
+    esp_zb_ep_list_t *ep_list = esp_zb_on_off_switch_ep_create(BUTTON_1_ENDPOINT, &switch_cfg);
+    add_manufacturer_info(ep_list, BUTTON_1_ENDPOINT);
+
+    // Create EP2 (Portail Parking) - create cluster list manually and add to ep_list
+    esp_zb_cluster_list_t *ep2_clusters = esp_zb_zcl_cluster_list_create();
 
     // Basic cluster
     esp_zb_basic_cluster_cfg_t basic_cfg = {
@@ -67,117 +48,34 @@ static esp_zb_cluster_list_t *create_button_clusters_no_identify(void)
         .power_source = ESP_ZB_ZCL_BASIC_POWER_SOURCE_DC_SOURCE
     };
     esp_zb_attribute_list_t *basic_attr_list = esp_zb_basic_cluster_create(&basic_cfg);
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, BASIC_MANUFACTURER);
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, BASIC_MODEL);
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_SW_BUILD_ID, BASIC_SW_BUILD);
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_PRODUCT_LABEL_ID, BASIC_EMPTY_LABEL);
-    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_LOCATION_DESCRIPTION_ID, BASIC_EMPTY_LABEL);
-    esp_zb_cluster_list_add_basic_cluster(cluster_list, basic_attr_list, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, MANUFACTURER_NAME);
+    esp_zb_basic_cluster_add_attr(basic_attr_list, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, MODEL_IDENTIFIER);
+    esp_zb_cluster_list_add_basic_cluster(ep2_clusters, basic_attr_list, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
     // On/Off cluster
-    esp_zb_on_off_cluster_cfg_t on_off_cfg = { .on_off = false };
+    esp_zb_on_off_cluster_cfg_t on_off_cfg = {.on_off = false};
     esp_zb_attribute_list_t *on_off_attr_list = esp_zb_on_off_cluster_create(&on_off_cfg);
-    esp_zb_cluster_list_add_on_off_cluster(cluster_list, on_off_attr_list, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    esp_zb_cluster_list_add_on_off_cluster(ep2_clusters, on_off_attr_list, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
-    return cluster_list;
-}
+    // Identify cluster
+    esp_zb_identify_cluster_cfg_t identify_cfg = {.identify_time = 0};
+    esp_zb_attribute_list_t *identify_attr_list = esp_zb_identify_cluster_create(&identify_cfg);
+    esp_zb_cluster_list_add_identify_cluster(ep2_clusters, identify_attr_list, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
-// ====== Endpoint Creation ======
-void create_endpoints(void)
-{
-    esp_zb_ep_list_t *ep_list = esp_zb_ep_list_create();
-    
-    // Button 1 endpoint (Multistate Input - Portail Principal) with Identify
-    esp_zb_cluster_list_t *button1_clusters = create_button_clusters();
-    esp_zb_endpoint_config_t button1_config = {
-        .endpoint = BUTTON_1_ENDPOINT,
-        .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
-        .app_device_id = ESP_ZB_HA_ON_OFF_SWITCH_DEVICE_ID,
-        .app_device_version = 1
-    };
-    esp_zb_ep_list_add_ep(ep_list, button1_clusters, button1_config);
-    
-    // Button 2 endpoint (Multistate Input - Portail Parking) without Identify
-    esp_zb_cluster_list_t *button2_clusters = create_button_clusters_no_identify();
-    esp_zb_endpoint_config_t button2_config = {
+    // Add EP2 to endpoint list
+    esp_zb_endpoint_config_t ep2_config = {
         .endpoint = BUTTON_2_ENDPOINT,
         .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
         .app_device_id = ESP_ZB_HA_ON_OFF_SWITCH_DEVICE_ID,
-        .app_device_version = 1
+        .app_device_version = 0
     };
-    esp_zb_ep_list_add_ep(ep_list, button2_clusters, button2_config);
-    
-    // Register all endpoints
+    esp_zb_ep_list_add_ep(ep_list, ep2_clusters, ep2_config);
+
+    // Register both endpoints
     ESP_LOGI(TAG, "Registering endpoints with Zigbee stack...");
     esp_zb_device_register(ep_list);
 
-    // Set Basic cluster strings (manufacturer/model common, labels per endpoint)
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_1_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID,
-                                       BASIC_MANUFACTURER,
-                                       true);
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_1_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID,
-                                       BASIC_MODEL,
-                                       true);
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_1_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_SW_BUILD_ID,
-                                       BASIC_SW_BUILD,
-                                       true);
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_1_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_PRODUCT_LABEL_ID,
-                                       BASIC_EP1_LABEL,
-                                       true);
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_1_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_LOCATION_DESCRIPTION_ID,
-                                       BASIC_EP1_LABEL,
-                                       true);
-
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_2_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID,
-                                       BASIC_MANUFACTURER,
-                                       true);
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_2_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID,
-                                       BASIC_MODEL,
-                                       true);
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_2_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_SW_BUILD_ID,
-                                       BASIC_SW_BUILD,
-                                       true);
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_2_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_PRODUCT_LABEL_ID,
-                                       BASIC_EP2_LABEL,
-                                       true);
-    (void)esp_zb_zcl_set_attribute_val(BUTTON_2_ENDPOINT,
-                                       ESP_ZB_ZCL_CLUSTER_ID_BASIC,
-                                       ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
-                                       ESP_ZB_ZCL_ATTR_BASIC_LOCATION_DESCRIPTION_ID,
-                                       BASIC_EP2_LABEL,
-                                       true);
-    
-    ESP_LOGI(TAG, "Created Zigbee endpoints:");
-    ESP_LOGI(TAG, "  - Button 1: EP%d (Portail Principal)", BUTTON_1_ENDPOINT);
-    ESP_LOGI(TAG, "  - Button 2: EP%d (Portail Parking)", BUTTON_2_ENDPOINT);
-    ESP_LOGI(TAG, "Endpoints registered successfully");
+    ESP_LOGI(TAG, "Endpoints EP%d and EP%d registered successfully", BUTTON_1_ENDPOINT, BUTTON_2_ENDPOINT);
 }
 
 // ====== Button Click Detection ======
