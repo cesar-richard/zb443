@@ -7,15 +7,16 @@
 
 ## Vue d'ensemble
 
-Le **ZB433 Router** est un routeur Zigbee ESP32-C6 capable de contrôler des portes CAME-24 via 433MHz et de recevoir des mises à jour OTA. Il agit comme un pont entre votre réseau Zigbee (Zigbee2MQTT) et vos équipements CAME-24 existants.
+Le **ZB433 Router** est un routeur Zigbee ESP32-C6 capable de contrôler des portes CAME-24 via 433MHz. Il agit comme un pont entre votre réseau Zigbee (Zigbee2MQTT/Home Assistant) et vos équipements CAME-24 existants.
 
 ### Fonctionnalités
 
 - **Routeur Zigbee 3.0** : Compatible avec Zigbee2MQTT
 - **Contrôle 433MHz CAME-24** : Deux boutons (Portail Principal et Portail Parking)
-- **Identify**: cluster 0x0003 (IdentifyTime + TriggerEffect) avec effet LED
-- **Indicateur LED**: couleurs distinctes lors d’une commande
+- **Identify** : Cluster 0x0003 avec effet LED (breathing)
+- **Indicateur LED** : WS2812 avec couleurs distinctes par endpoint
 - **2 Endpoints** : EP1 (Portail Principal), EP2 (Portail Parking)
+- **Auto-reset** : L'attribut on_off se remet à OFF après 5 secondes (debounce)
 
 ## Installation
 
@@ -23,7 +24,7 @@ Le **ZB433 Router** est un routeur Zigbee ESP32-C6 capable de contrôler des por
 
 - **ESP-IDF v5.2.x** installé et configuré
 - **ESP32-C6 DevKit** (alimentation via USB)
-- **Émetteur 433MHz FS1000A** (ASK/OOK)
+- **Emetteur 433MHz FS1000A** (ASK/OOK)
 - **Zigbee2MQTT** configuré avec Home Assistant
 
 ### Compilation et flash
@@ -42,27 +43,22 @@ idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-### Configuration Wi-Fi
+## Utilisation
 
-Éditer `sdkconfig.defaults` :
+### Endpoints disponibles
 
-```ini
-CONFIG_ZB433_WIFI_SSID="VOTRE_SSID"
-CONFIG_ZB433_WIFI_PASSWORD="VOTRE_MOT_DE_PASSE"
-CONFIG_ZB433_DEFAULT_OTA_URL="http://homeassistant.local:8123/local/zb433.bin"
-```
+| Endpoint | Fonction | Code 433MHz |
+|----------|----------|-------------|
+| **EP1** | Portail Principal | 0x03B29B |
+| **EP2** | Portail Parking | 0x03B29A |
 
-## Configuration
+### Clusters Zigbee par endpoint
 
-### Zigbee2MQTT
+- **Basic (0x0000)** : Manufacturer "Cesar RICHARD EI", Model "ZB433-Router"
+- **On/Off (0x0006)** : Controle du portail (ON = envoi 433MHz)
+- **Identify (0x0003)** : Identification visuelle via LED
 
-1. Mettre le coordinateur en mode "permit join"
-2. L'appareil s'inclut automatiquement et expose 2 endpoints :
-   - **EP1** : Portail Principal (code 0x03B29B)
-   - **EP2** : Portail Parking (code 0x03B29A)
-3. Identify (device): utiliser le cluster `genIdentify` sur EP1 (IdentifyTime/TriggerEffect)
-
-### Exemple MQTT
+### Exemples MQTT
 
 ```bash
 # Ouvrir Portail Principal (EP1)
@@ -71,62 +67,90 @@ mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/1/set" -m '{"state":"ON"
 # Ouvrir Portail Parking (EP2)
 mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/2/set" -m '{"state":"ON"}'
 
-# Identify via attribut (EP1)
-mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/1/set" -m '{"write":{"cluster":"genIdentify","payload":{"identify_time":5}}}'
+# Identify via attribut (EP1) - LED breathing pendant 5 secondes
+mosquitto_pub -h localhost -t "zigbee2mqtt/ZB433 Router/1/set" -m '{"identify":5}'
 ```
 
-## Utilisation
+### Feedback LED
 
-### Endpoints disponibles
+| Etat | Couleur |
+|------|---------|
+| Demarrage | Rouge |
+| Attente connexion | Orange |
+| Connecte au reseau | LED eteinte |
+| Commande EP1 | Bleu-cyan |
+| Commande EP2 | Magenta |
+| Identify | Breathing blanc-bleu |
 
-| Endpoint | Fonction | Action |
-|----------|----------|--------|
-| **EP1** | Portail Principal | `state: ON` → TX 433MHz (0x03B29B) |
-| **EP2** | Portail Parking   | `state: ON` → TX 433MHz (0x03B29A) |
+## Schema de cablage
 
-Identify (device): via EP1 (`genIdentify.identify_time`, TriggerEffect).
-LED: EP1 bleu-cyan, EP2 magenta lors d’une commande.
+### GPIO Assignments
 
-### Procédure OTA
+| GPIO | Fonction | Details |
+|------|----------|---------|
+| **GPIO4** | 433MHz TX | Driver high-side NPN+PNP |
+| **GPIO8** | WS2812 LED | Indicateur RGB |
 
-1. **Déposer le binaire** dans `config/www/` de Home Assistant
-2. **Accéder** à `http://homeassistant.local:8123/local/zb433.bin`
-3. **Déclencher** via EP13 ou modifier l'URL via attribut 0xF001
+### Circuit 433MHz
 
-### Procédure Factory Reset
+Voir le guide detaille: `CABLAGE_PROD_FS1000A.md` (montage 5V prod-ready avec 2N2222 open-collector).
 
-- Envoyer `ON` sur EP14 → efface NVS + reboot automatique
+- **TX** : `GPIO4` → R 1 kOhm → Base 2N2222, Collecteur → DATA FS1000A, Emetteur → GND
+- **Pull-up** : DATA 10 kOhm vers +5V
+- **Alim** : +5V et GND communs, 100nF pres du FS1000A, 470uF sur le rail 5V
+- **LED** : `GPIO8` (WS2812)
+- **Antenne** : fil 17,3 cm (lambda/4)
 
-## Schéma de câblage
+## Configuration Zigbee
 
-Voir le guide détaillé: `CABLAGE_PROD_FS1000A.md` (montage 5V prod‑ready avec 2N2222 open‑collector, inversion déjà gérée par le firmware).
+### Parametres du routeur
 
-- TX: `GPIO9` → R 1 kΩ → Base 2N2222, Collecteur → DATA FS1000A, Émetteur → GND, Pull‑up DATA 10 kΩ vers +5 V
-- Alim: +5 V et GND communs, 100 nF près du FS1000A, 470 µF sur le rail 5 V
-- LED: `GPIO8` (WS2812)
-- Antenne: fil 17,3 cm (λ/4)
+- **Type** : Router (ESP_ZB_DEVICE_TYPE_ROUTER)
+- **Canaux** : Scan tous les canaux (ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK)
+- **Profil** : Home Automation (0x0104)
+- **Max children** : 10
 
-## Dépannage
+### Inclusion au reseau
+
+1. Mettre le coordinateur en mode "permit join"
+2. L'appareil s'inclut automatiquement et expose 2 endpoints
+3. Si l'inclusion echoue, le device reessaie automatiquement apres 1 seconde
+
+## Depannage
 
 ### Device ne s'inclut pas
-- Vérifier que le coordinateur est en "permit join"
-- Contrôler le canal Zigbee (11, 15, 20, 25)
-- Redémarrer Zigbee2MQTT
 
-### Portes 433MHz ne répondent pas
-- Vérifier les clés CAME-24 dans le code
-- Ajuster les timings T_SHORT/T_LONG si nécessaire
-- Augmenter le nombre de répétitions
-- Contrôler l'antenne (17,3 cm)
+- Verifier que le coordinateur est en "permit join"
+- Controler le canal Zigbee (le device scanne tous les canaux)
+- Redemarrer Zigbee2MQTT
+- Eteindre les autres routeurs Zigbee orphelins qui peuvent interferer
 
-### OTA ne fonctionne pas
-- Vérifier SSID/mot de passe Wi-Fi
-- Contrôler que l'URL est joignable
-- Consulter les logs série pour plus de détails
+### Portes 433MHz ne repondent pas
 
-## Méthode vendoring (si nécessaire)
+- Verifier les cles CAME-24 dans le code (`came433.h`)
+- Controler l'antenne (17,3 cm)
+- Verifier le cablage du driver NPN (GPIO4 doit etre LOW au repos)
+- Augmenter le nombre de repetitions (CAME_REPEATS dans `came433.h`)
 
-Si le Component Manager pose problème :
+### LED ne s'allume pas
+
+- Verifier le cablage de la LED WS2812 sur GPIO8
+- Controler l'alimentation 5V de la LED
+
+## Architecture du code
+
+```
+main/
+├── main.c        # Point d'entree, initialisation
+├── zigbee.c/h    # Stack Zigbee, signal handler, action handlers
+├── endpoints.c/h # Creation des endpoints, gestion des commandes
+├── came433.c/h   # Protocole CAME-24 via RMT
+└── led.c/h       # Controle LED WS2812
+```
+
+## Methode vendoring (si necessaire)
+
+Si le Component Manager pose probleme :
 
 ```bash
 # Cloner la librairie Zigbee
@@ -140,4 +164,4 @@ idf.py build
 
 ## Licence
 
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
+Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de details.
